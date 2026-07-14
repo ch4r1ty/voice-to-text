@@ -13,13 +13,11 @@ import os
 import sys
 import tempfile
 import time
+import subprocess
 
-# Set up ffmpeg path for pydub (bundled via imageio-ffmpeg for .exe)
+# Set up ffmpeg path (bundled via imageio-ffmpeg for .exe)
 import imageio_ffmpeg
-_ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-
-from pydub import AudioSegment
-AudioSegment.converter = _ffmpeg_path
+FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 class VoiceToTextApp:
@@ -356,6 +354,30 @@ class VoiceToTextApp:
         thread = threading.Thread(target=self._process_file, args=(filepath,), daemon=True)
         thread.start()
 
+    def _convert_to_wav(self, src_path, dest_path):
+        """Convert any audio file to 16kHz mono WAV using bundled ffmpeg."""
+        cmd = [
+            FFMPEG_PATH,
+            "-y",                # overwrite output
+            "-i", src_path,      # input
+            "-ar", "16000",      # sample rate 16kHz
+            "-ac", "1",          # mono
+            "-acodec", "pcm_s16le",  # 16-bit PCM
+            dest_path,
+        ]
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            err = e.stderr.decode("utf-8", errors="ignore")[:500]
+            raise RuntimeError(f"ffmpeg failed: {err}")
+        except FileNotFoundError:
+            raise RuntimeError(f"ffmpeg not found at {FFMPEG_PATH}")
+
     def _process_file(self, filepath):
         lang_code = self._get_lang_code()
         filename = os.path.basename(filepath)
@@ -365,21 +387,21 @@ class VoiceToTextApp:
         self._chunk_times = []
 
         try:
-            # ── Step 1: Load / convert audio ──
+            # ── Step 1: Create temp WAV and convert / normalize audio ──
             ext = os.path.splitext(filepath)[1].lower()
+            temp_fd, temp_wav_path = tempfile.mkstemp(suffix=".wav")
+            os.close(temp_fd)
+            wav_path = temp_wav_path
+
             if ext == ".wav":
-                wav_path = filepath
-                self._safe_status(f"Loading {filename}...", "orange")
-                self._log(f"Loading WAV file: {filename}")
+                self._safe_status(f"Normalizing {filename}...", "orange")
+                self._log(f"Normalizing WAV: {filename}")
             else:
                 self._safe_status(f"Converting {filename} to WAV...", "orange")
                 self._log(f"Converting {ext} to WAV via ffmpeg...")
-                audio = AudioSegment.from_file(filepath)
-                temp_fd, temp_wav_path = tempfile.mkstemp(suffix=".wav")
-                os.close(temp_fd)
-                audio.export(temp_wav_path, format="wav")
-                wav_path = temp_wav_path
-                self._log(f"Conversion complete ({len(audio) / 1000:.1f}s audio)")
+
+            self._convert_to_wav(filepath, wav_path)
+            self._log(f"WAV ready: {wav_path}")
 
             # ── Step 2: Analyze duration & plan chunks ──
             with sr.AudioFile(wav_path) as source:
