@@ -1,0 +1,5 @@
+=== English Test (test_english.wav) ===
+The quick brown fox jumps over the lazy dog. Today is a beautiful sunny day. I am testing a voice to text application to see how accurate it is. Speech recognition technology has improved significantly in recent years. Machine learning models can now understand many languages and accents. Let us see how well this transcription works. Artificial intelligence is transforming the way we interact with computers. Thank you for watching this demonstration.
+
+=== Chinese Test (test_chinese.wav) ===
+你好，这是一个语音转文字的测试。今天天气很好，阳光明媚。我在测试语音识别的准确率，看看转换效果如何。科技改变生活，人工智能正在快速发展。希望这个工具能帮助你提高工作效率。谢谢你的使用。
