@@ -356,10 +356,19 @@ class VoiceToTextApp:
 
     def _convert_to_wav(self, src_path, dest_path):
         """Convert any audio file to 16kHz mono WAV using bundled ffmpeg."""
+        # Guard against empty/corrupted files
+        if not os.path.exists(src_path):
+            raise RuntimeError(f"File not found: {src_path}")
+        if os.path.getsize(src_path) == 0:
+            raise RuntimeError(f"File is empty (0 bytes): {os.path.basename(src_path)}")
+
         cmd = [
             FFMPEG_PATH,
+            "-hide_banner",      # skip version/config banner
+            "-loglevel", "error",# only show real errors
             "-y",                # overwrite output
             "-i", src_path,      # input
+            "-vn",               # ignore video streams (if any)
             "-ar", "16000",      # sample rate 16kHz
             "-ac", "1",          # mono
             "-acodec", "pcm_s16le",  # 16-bit PCM
@@ -370,13 +379,19 @@ class VoiceToTextApp:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                check=True,
             )
-        except subprocess.CalledProcessError as e:
-            err = e.stderr.decode("utf-8", errors="ignore")[:500]
-            raise RuntimeError(f"ffmpeg failed: {err}")
+            if result.returncode != 0:
+                err = result.stderr.decode("utf-8", errors="ignore").strip()
+                # If still empty, show a generic hint
+                if not err:
+                    err = f"ffmpeg exited with code {result.returncode}"
+                raise RuntimeError(f"ffmpeg failed: {err}")
         except FileNotFoundError:
             raise RuntimeError(f"ffmpeg not found at {FFMPEG_PATH}")
+
+        # Make sure output actually exists and has content
+        if not os.path.exists(dest_path) or os.path.getsize(dest_path) == 0:
+            raise RuntimeError("ffmpeg produced no output; the input file may be corrupted or not a valid audio file.")
 
     def _process_file(self, filepath):
         lang_code = self._get_lang_code()

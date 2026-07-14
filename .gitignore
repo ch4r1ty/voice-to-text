@@ -21,8 +21,14 @@ Thumbs.db
 .DS_Store
 
 # Test artifacts (large files, keep out of repo)
-test_*.wav
-test_*.mp3
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.wma
+*.aac
+*.aiff
 *.exe
 
 # Build cache
