@@ -19,6 +19,8 @@ import subprocess
 import imageio_ffmpeg
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
+from punctuator import add_punctuation
+
 
 class VoiceToTextApp:
     def __init__(self, root):
@@ -211,6 +213,19 @@ class VoiceToTextApp:
             self.text_area.see("end")
         self.root.after(0, _do)
 
+    def _add_punctuation_if_supported(self, text, lang_code):
+        if not text or not text.strip():
+            return text
+
+        lang = lang_code.split("-")[0].lower()
+        if lang not in {"en", "zh"}:
+            return text.strip()
+
+        try:
+            return add_punctuation(text.strip(), lang_code).strip()
+        except Exception:
+            return text.strip()
+
     def _log(self, msg):
         """Append a timestamped line to the detail log panel."""
         ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -298,8 +313,9 @@ class VoiceToTextApp:
                 try:
                     text = self.recognizer.recognize_google(audio, language=lang_code)
                     if text.strip():
+                        punctuated_text = self._add_punctuation_if_supported(text, lang_code)
                         timestamp = datetime.datetime.now().strftime("[%H:%M:%S] ")
-                        self._insert_text(timestamp + text + "\n")
+                        self._insert_text(timestamp + punctuated_text + "\n")
                         self._safe_status("Ready. Listening for next phrase...", "red")
                 except sr.UnknownValueError:
                     self._safe_status("Could not understand audio. Listening again...", "orange")
@@ -476,9 +492,10 @@ class VoiceToTextApp:
                     self._chunk_times.append(chunk_elapsed)
 
                     if text.strip():
-                        all_text.append(text.strip())
+                        punctuated_text = self._add_punctuation_if_supported(text, lang_code)
+                        all_text.append(punctuated_text)
                         # Show partial result immediately with chunk tag
-                        self._insert_text(f"[{offset:.0f}s] {text.strip()}\n")
+                        self._insert_text(f"[{offset:.0f}s] {punctuated_text}\n")
                         self._log(f"Chunk {i + 1}/{self._total_chunks}: OK ({chunk_elapsed:.1f}s) — {len(text)} chars")
                     else:
                         self._log(f"Chunk {i + 1}/{self._total_chunks}: empty result ({chunk_elapsed:.1f}s)")
